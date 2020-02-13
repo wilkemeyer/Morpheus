@@ -15,12 +15,14 @@ import net.quetzi.morpheus.helpers.SleepChecker;
 import net.quetzi.morpheus.world.WorldSleepState;
 import org.apache.logging.log4j.Logger;
 
+import com.feed_the_beast.ftblib.FTBLib;
+
 import java.util.HashMap;
 
 @Mod(modid = References.MODID,
         name = References.NAME,
         version = References.VERSION,
-        dependencies = "required-after:forge@[14.21.0.2320,);",
+        dependencies = FTBLib.THIS_DEP + ";required-after:ftbutilities;required-after:forge@[14.21.0.2320,);",
         acceptableRemoteVersions = "*",
         acceptedMinecraftVersions = "[1.12,1.13)"
 )
@@ -36,6 +38,8 @@ public class Morpheus
     public static  boolean       includeMiners;
     public static  int           groundLevel;
     public static  boolean       setSpawnDaytime;
+    public static  boolean       ignorePlayersInSpawnArea;
+    public static  boolean		 ignoreAfkPlayers;
     public static  Configuration config;
 
     @Instance(References.MODID)
@@ -68,6 +72,8 @@ public class Morpheus
         includeMiners = config.get("settings", "IncludeMiners", true).getBoolean();
         groundLevel = config.getInt("settings", "GroundLevel", 64, 1, 255, "Ground Level (1-255)");
         setSpawnDaytime = config.get("settings", "AllowSetSpawnDaytime", true).getBoolean();
+        ignorePlayersInSpawnArea = config.get("settings", "IgnorePlayersInSpawnArea", false).getBoolean();
+        ignoreAfkPlayers = config.get("settings", "ignoreAfkPlayers", false).getBoolean();
         config.save();
     }
 

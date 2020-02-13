@@ -1,11 +1,20 @@
 package net.quetzi.morpheus.world;
 
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldServer;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.quetzi.morpheus.Morpheus;
 
 import java.util.HashMap;
 import java.util.Map.Entry;
+
+import com.feed_the_beast.ftblib.lib.data.Universe;
+import com.feed_the_beast.ftblib.lib.math.ChunkDimPos;
+import com.feed_the_beast.ftbutilities.FTBUtilitiesConfig;
+import com.feed_the_beast.ftbutilities.data.FTBUtilitiesPlayerData;
+import com.feed_the_beast.ftbutilities.data.FTBUtilitiesUniverseData;
 
 public class WorldSleepState
 {
@@ -20,22 +29,56 @@ public class WorldSleepState
 
     public int getPercentSleeping()
     {
-        return (this.playerStatus.size() - this.getMiningPlayers() > 0) ? (this.getSleepingPlayers() > 0) ? (this.getSleepingPlayers() * 100) / (this.playerStatus.size() - this.getMiningPlayers()) : 0 : 100;
+    	int numPlayers = this.playerStatus.size() - this.getIgnoredPlayers();    	
+        return (numPlayers > 0) ? (this.getSleepingPlayers() > 0) ? (this.getSleepingPlayers() * 100) / (numPlayers) : 0 : 100;
     }
 
-    private int getMiningPlayers()
+    private int getIgnoredPlayers()
     {
         int miningPlayers = 0;
-        for (EntityPlayer player : FMLCommonHandler.instance().getMinecraftServerInstance().getWorld(this.dimension).playerEntities)
+        int spawnPlayers = 0;
+        int afkPlayers = 0;
+        
+        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        WorldServer world = FMLCommonHandler.instance().getMinecraftServerInstance().getWorld(this.dimension);
+
+        Universe universe = null;
+        if(Universe.loaded())
+        	universe = Universe.get();
+        
+        for (EntityPlayer player : world.playerEntities)
         {
             if (player.posY < Morpheus.groundLevel)
             {
                 miningPlayers++;
             }
+            
+            if (player.dimension == 0 && FTBUtilitiesUniverseData.isInSpawn(server, new ChunkDimPos(player)) ) {
+            	spawnPlayers++;
+            }
+            
+            if(Morpheus.ignoreAfkPlayers) {
+            	FTBUtilitiesPlayerData data = FTBUtilitiesPlayerData.get(universe.getPlayer(player));
+            	if(data.afkTime >= FTBUtilitiesConfig.afk.getNotificationTimer() ) {
+            		afkPlayers++;
+            	}
+            }
+            
         }
-        return !Morpheus.includeMiners ? miningPlayers : 0;
+        
+        
+        int retVal = 0;
+        if(!Morpheus.includeMiners)
+        	retVal += miningPlayers;
+        if(Morpheus.ignoreAfkPlayers)
+        	retVal += afkPlayers;
+        if(Morpheus.ignorePlayersInSpawnArea)
+        	retVal += spawnPlayers;
+        
+        return retVal;
     }
 
+	
     public int getSleepingPlayers()
     {
         int asleepCount = 0;
@@ -51,7 +94,11 @@ public class WorldSleepState
 
     public String toString()
     {
-        return Morpheus.includeMiners ? this.getSleepingPlayers() + "/" + this.playerStatus.size() + " (" + this.getPercentSleeping() + "%)" : this.getSleepingPlayers() + "/" + this.playerStatus.size() + " - " + this.getMiningPlayers() + " miners (" + this.getPercentSleeping() + "%)";
+    	boolean includeIgnored = false;
+    	if(Morpheus.ignoreAfkPlayers || !Morpheus.includeMiners || Morpheus.ignorePlayersInSpawnArea)
+    		includeIgnored = true;
+ 
+    	return !includeIgnored ? this.getSleepingPlayers() + "/" + this.playerStatus.size() + " (" + this.getPercentSleeping() + "%)" : this.getSleepingPlayers() + "/" + this.playerStatus.size() + " - " + this.getIgnoredPlayers() + " AFK/Spawn (" + this.getPercentSleeping() + "%)";
     }
 
     public void setPlayerAsleep(String username)

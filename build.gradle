@@ -1,80 +1,84 @@
 buildscript {
-    repositories {
-        mavenCentral()
-        maven {
-            name = "forge"
-            url = "http://files.minecraftforge.net/maven"
-        }
-        maven {
-            name = "sonatype"
-            url = "https://oss.sonatype.org/content/repositories/snapshots/"
-        }
-    }
-    dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
-    }
+	repositories {
+		jcenter()
+		maven { url = "http://files.minecraftforge.net/maven" }
+		maven { url "https://plugins.gradle.org/m2/" }
+	}
+	dependencies {
+		classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
+		classpath 'gradle.plugin.com.matthewprenger:CurseGradle:1.1.0'
+		classpath 'com.wynprice.cursemaven:CurseMaven:1.2.+'
+	}
 }
 
 apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'com.matthewprenger.cursegradle'
+apply plugin: 'maven'
+apply plugin: 'com.wynprice.cursemaven'
 
-project.ext {
-    major = "3"
-    minor = "4"
-    if (System.getenv("BUILD_NUMBER") != null) {
-        build = System.getenv("BUILD_NUMBER")
-    } else {
-        build = "-custom"
-    }
-    mcVersion = "1.12.2"
-}
-version = "${project.ext.mcVersion}-${project.ext.major}.${project.minor}.${project.build}"
-group = "net.quetzi.morpheus"
-archivesBaseName = "Morpheus"
+apply from: 'https://raw.githubusercontent.com/MinecraftModDevelopment/Gradle-Collection/master/generic/markdown-git-changelog.gradle'
 
-allprojects {
-    apply plugin: 'java'
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
+def ENV = System.getenv()
+def build_number = ENV.BUILD_NUMBER ? "${ENV.BUILD_NUMBER}" : "0-custom"
+version = "${mod_version_major}.${mod_version_minor}.${build_number}"
+group = package_group
+archivesBaseName = mod_name
+
+sourceCompatibility = targetCompatibility = "1.8"
+compileJava {
+	sourceCompatibility = targetCompatibility = "1.8"
 }
 
 minecraft {
-    version = "${project.ext.mcVersion}-14.23.0.2487"
-    runDir = "run"
-    mappings = "snapshot_20170919"
-
-    // replacing stuff in the source
-    replace '@MAJOR@', project.major
-    replace '@MINOR@', project.minor
-    replace '@MC_VERSION@', project.ext.mcVersion
-    replace '@BUILD_NUMBER@', project.build
+	version = "${mc_version}-${forge_version}"
+	runDir = "run"
+	mappings = "${mappings_version}"
+	
+    replace '@MAJOR@', mod_version_major
+    replace '@MINOR@', mod_version_minor
+    replace '@MC_VERSION@', mc_version
+    replace '@BUILD_NUMBER@', build_number
 }
 
-task libJar(type: Jar) {
-    from(sourceSets.main.java) {
-        include "net/quetzi/morpheus/api/*"
-    }
-    classifier = 'api'
+configurations.all {
+	transitive = false
 }
 
-artifacts {
-    archives libJar
+repositories {
+	mavenLocal()
+	maven { url "https://maven.latmod.com/" } //FTB Library, KubeJS, Aurora
+}
+
+dependencies {
+	deobfCompile "com.feed_the_beast.mods:FTBLib:${ftblib_version}"
+	deobfCompile "com.feed_the_beast.mods:FTBUtilities:${ftbutilities_version}"
 }
 
 processResources {
-    // this will ensure that this task is redone when the versions change.
-    inputs.property "version", project.version
-    inputs.property "mcversion", project.minecraft.version
+	inputs.property "version", project.version
+	inputs.property "mcversion", project.minecraft.version
 
-    // replace stuff in mcmod.info, nothing else
-    from(sourceSets.main.resources.srcDirs) {
-        include '*.info'
+	from(sourceSets.main.resources.srcDirs) {
+		include 'mcmod.info'
+		expand 'version': project.version, 'mcversion': project.minecraft.version
+	}
 
-        // replace version and mcversion
-        expand 'version': project.version, 'mcversion': project.minecraft.version
-    }
-
-    // copy everything else, thats not the mcmod.info
-    from(sourceSets.main.resources.srcDirs) {
-        exclude 'mcmod.info'
-    }
+	from(sourceSets.main.resources.srcDirs) {
+		exclude 'mcmod.info'
+	}
 }
+
+artifacts {
+	archives sourceJar
+}
+
+if (ENV.LOCAL_MAVEN) {
+	uploadArchives {
+		repositories {
+			mavenDeployer {
+				repository(url: "file://${ENV.LOCAL_MAVEN}")
+			}
+		}
+	}
+}
+
